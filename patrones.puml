@@ -1,0 +1,826 @@
+@startuml Patron_Singleton_Registry
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón SINGLETON - ContenidoServiceRegistry
+
+class ContenidoServiceRegistry << (S,orchid) Singleton >> {
+    {static} -_instance : ContenidoServiceRegistry
+    {static} -_lock : Lock
+    -_cancion_service : CancionService
+    -_album_service : AlbumService
+    -_artista_service : ArtistaService
+    -_playlist_service : PlaylistService
+    -_reproducir_handlers : dict<Type, Callable>
+    -_mostrar_datos_handlers : dict<Type, Callable>
+    ====
+    {static} +__new__(cls) : ContenidoServiceRegistry
+    {static} +get_instance() : ContenidoServiceRegistry
+    -_inicializar_servicios() : void
+    ====
+    +reproducir(contenido : Contenido, usuario : Usuario) : void
+    +mostrar_datos(contenido : Contenido) : void
+    ====
+    -_reproducir_cancion(cancion : Cancion, usuario : Usuario) : void
+    -_reproducir_album(album : Album, usuario : Usuario) : void
+    -_reproducir_playlist(playlist : Playlist, usuario : Usuario) : void
+    ====
+    -_mostrar_datos_cancion(cancion : Cancion) : void
+    -_mostrar_datos_album(album : Album) : void
+    -_mostrar_datos_artista(artista : Artista) : void
+    -_mostrar_datos_playlist(playlist : Playlist) : void
+}
+
+note right of ContenidoServiceRegistry
+    SINGLETON PATTERN
+    
+    Proposito:
+    * Garantizar una unica instancia global
+    * Compartir estado entre servicios
+    * Centralizar logica de reproduccion
+    
+    Implementacion:
+    * Thread-safe con threading.Lock
+    * Double-checked locking
+    * Lazy initialization
+    * Control con __new__
+    
+    Uso:
+    registry = ContenidoServiceRegistry()
+    o
+    registry = ContenidoServiceRegistry.get_instance()
+    
+    Ambos retornan la MISMA instancia
+end note
+
+note as N1
+    Diccionarios de Handlers (Registry Pattern)
+    
+    _reproducir_handlers = {
+        Cancion: self._reproducir_cancion,
+        Album: self._reproducir_album,
+        Playlist: self._reproducir_playlist
+    }
+    
+    _mostrar_datos_handlers = {
+        Cancion: self._mostrar_datos_cancion,
+        Album: self._mostrar_datos_album,
+        Artista: self._mostrar_datos_artista,
+        Playlist: self._mostrar_datos_playlist
+    }
+    
+    Dispatch polimorfico sin isinstance()
+    Complejidad O(1) para lookup
+end note
+
+@enduml
+
+@startuml Patron_Factory_Planes
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón FACTORY METHOD - PlanFactory
+
+package "<<Factory>>" #Orange {
+    class PlanFactory <<static>> {
+        {static} +crear_plan(tipo : str) : Plan
+        ====
+        {static} -_crear_free() : PlanFree
+        {static} -_crear_premium() : PlanPremium
+        {static} -_crear_family() : PlanFamily
+    }
+}
+
+package "<<Entities>>" #LightGreen {
+    abstract class Plan {
+        #_precio : float
+        #_calidad_audio : str
+        #_anuncios : bool
+        #_descargas : bool
+        #_saltos_ilimitados : bool
+        ====
+        +get_precio() : float
+        +get_calidad_audio() : str
+        +tiene_anuncios() : bool
+        +puede_descargar() : bool
+        +tiene_saltos_ilimitados() : bool
+    }
+    
+    class PlanFree {
+        -_limite_saltos : int
+        ====
+        +__init__()
+        +get_limite_saltos() : int
+    }
+    
+    class PlanPremium {
+        -_descargas_offline : bool
+        ====
+        +__init__()
+        +puede_descargar_offline() : bool
+    }
+    
+    class PlanFamily {
+        -_max_usuarios : int
+        -_calidad_lossless : bool
+        ====
+        +__init__()
+        +get_max_usuarios() : int
+        +tiene_lossless() : bool
+    }
+}
+
+PlanFactory ..> Plan : <<creates>>
+PlanFactory ..> PlanFree : <<creates>>
+PlanFactory ..> PlanPremium : <<creates>>
+PlanFactory ..> PlanFamily : <<creates>>
+
+Plan <|-- PlanFree
+Plan <|-- PlanPremium
+Plan <|-- PlanFamily
+
+note right of PlanFactory
+    FACTORY METHOD PATTERN
+    
+    Proposito:
+    * Encapsular creacion de planes
+    * Desacoplar cliente de clases concretas
+    * Centralizar logica de instanciacion
+    
+    Implementacion:
+    * Diccionario de factories
+    * Metodos estaticos dedicados
+    * Retorna tipo base abstracto
+    
+    Uso:
+    plan = PlanFactory.crear_plan(Premium)
+    Retorna Plan (no PlanPremium concreto)
+    
+    Ventajas:
+    * Cliente no conoce tipos concretos
+    * Facil agregar nuevos planes
+    * Validacion centralizada
+end note
+
+note as N1
+    Diccionario de Factories
+    
+    factories = {
+        Free: PlanFactory._crear_free,
+        Premium: PlanFactory._crear_premium,
+        Family: PlanFactory._crear_family
+    }
+    
+    if tipo not in factories:
+        raise ValueError(tipo desconocido)
+    
+    return factories[tipo]()
+end note
+
+note top of PlanFree
+    Plan Gratuito:
+    * Precio: $0
+    * Calidad: 128kbps
+    * Anuncios: Si
+    * Descargas: No
+    * Saltos: 6 por hora
+end note
+
+note top of PlanPremium
+    Plan Premium:
+    * Precio: $999
+    * Calidad: 320kbps
+    * Anuncios: No
+    * Descargas: Si
+    * Saltos: Ilimitados
+end note
+
+note top of PlanFamily
+    Plan Familiar:
+    * Precio: $1499
+    * Calidad: Lossless (FLAC)
+    * Anuncios: No
+    * Descargas: Si
+    * Usuarios: 6 cuentas
+end note
+
+@enduml
+
+@startuml Patron_Strategy_Calidad_Audio
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón STRATEGY - Calidad de Audio
+
+package "<<Strategy Interface>>" #LightPink {
+    interface CalidadAudioStrategy {
+        +obtener_archivo(cancion : Cancion) : str
+        +get_bitrate() : str
+        +get_tamano_aproximado(duracion : int) : float
+    }
+}
+
+package "<<Concrete Strategies>>" #LightCyan {
+    class CalidadBajaStrategy {
+        +obtener_archivo(cancion : Cancion) : str
+        +get_bitrate() : str
+        +get_tamano_aproximado(duracion : int) : float
+    }
+    
+    class CalidadAltaStrategy {
+        +obtener_archivo(cancion : Cancion) : str
+        +get_bitrate() : str
+        +get_tamano_aproximado(duracion : int) : float
+    }
+    
+    class CalidadLosslessStrategy {
+        +obtener_archivo(cancion : Cancion) : str
+        +get_bitrate() : str
+        +get_tamano_aproximado(duracion : int) : float
+    }
+}
+
+package "<<Strategy Context>>" #LightYellow {
+    class ReproductorService {
+        #_estrategia_calidad : CalidadAudioStrategy
+        ====
+        +__init__(estrategia : CalidadAudioStrategy)
+        +reproducir(cancion : Cancion, usuario : Usuario) : void
+        +cambiar_calidad(estrategia : CalidadAudioStrategy) : void
+    }
+}
+
+package "<<Entities>>" #LightGreen {
+    class Cancion {
+        -_titulo : str
+        -_artista : Artista
+        -_duracion : int
+        -_archivos : dict
+        ====
+        +get_archivo_128() : str
+        +get_archivo_320() : str
+        +get_archivo_lossless() : str
+    }
+    
+    class Usuario {
+        -_username : str
+        -_plan : Plan
+        ====
+        +get_plan() : Plan
+    }
+}
+
+CalidadAudioStrategy <|.. CalidadBajaStrategy
+CalidadAudioStrategy <|.. CalidadAltaStrategy
+CalidadAudioStrategy <|.. CalidadLosslessStrategy
+
+ReproductorService o-- CalidadAudioStrategy : usa
+ReproductorService --> Cancion : reproduce
+ReproductorService --> Usuario : verifica plan
+
+note right of CalidadAudioStrategy
+    STRATEGY PATTERN
+    
+    Proposito:
+    * Algoritmos intercambiables de calidad
+    * Inyeccion de dependencias
+    * Diferentes estrategias por plan
+    
+    Calidad Baja (Free):
+    - Bitrate: 128kbps
+    - Archivo: cancion_128.mp3
+    - Tamano: ~4MB por minuto
+    
+    Calidad Alta (Premium):
+    - Bitrate: 320kbps
+    - Archivo: cancion_320.mp3
+    - Tamano: ~9.6MB por minuto
+    
+    Calidad Lossless (Family):
+    - Bitrate: Variable (FLAC)
+    - Archivo: cancion.flac
+    - Tamano: ~30MB por minuto
+end note
+
+note left of ReproductorService
+    Strategy Context
+    
+    Delega la seleccion de archivo
+    a la estrategia inyectada:
+    
+    def reproducir(self, cancion, usuario):
+        plan = usuario.get_plan()
+        estrategia = self._seleccionar_estrategia(plan)
+        archivo = estrategia.obtener_archivo(cancion)
+        self._cargar_y_reproducir(archivo)
+end note
+
+@enduml
+
+@startuml Patron_State_Reproductor
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón STATE - Estados del Reproductor
+
+package "<<State Interface>>" #LightPink {
+    interface EstadoReproductor {
+        +handle_play(reproductor : Reproductor) : void
+        +handle_pause(reproductor : Reproductor) : void
+        +handle_stop(reproductor : Reproductor) : void
+        +handle_siguiente(reproductor : Reproductor) : void
+        +handle_anterior(reproductor : Reproductor) : void
+    }
+}
+
+package "<<Concrete States>>" #LightCyan {
+    class EstadoDetenido {
+        +handle_play(reproductor : Reproductor) : void
+        +handle_pause(reproductor : Reproductor) : void
+        +handle_stop(reproductor : Reproductor) : void
+        +handle_siguiente(reproductor : Reproductor) : void
+        +handle_anterior(reproductor : Reproductor) : void
+    }
+    
+    class EstadoReproduciendo {
+        +handle_play(reproductor : Reproductor) : void
+        +handle_pause(reproductor : Reproductor) : void
+        +handle_stop(reproductor : Reproductor) : void
+        +handle_siguiente(reproductor : Reproductor) : void
+        +handle_anterior(reproductor : Reproductor) : void
+    }
+    
+    class EstadoPausado {
+        +handle_play(reproductor : Reproductor) : void
+        +handle_pause(reproductor : Reproductor) : void
+        +handle_stop(reproductor : Reproductor) : void
+        +handle_siguiente(reproductor : Reproductor) : void
+        +handle_anterior(reproductor : Reproductor) : void
+    }
+}
+
+package "<<Context>>" #LightYellow {
+    class Reproductor {
+        -_estado_actual : EstadoReproductor
+        -_cancion_actual : Cancion
+        -_posicion : int
+        -_volumen : int
+        -_cola : ColaReproduccion
+        ====
+        +__init__()
+        +play() : void
+        +pause() : void
+        +stop() : void
+        +siguiente() : void
+        +anterior() : void
+        +seek(posicion : int) : void
+        +set_estado(estado : EstadoReproductor) : void
+        +get_estado() : EstadoReproductor
+    }
+}
+
+EstadoReproductor <|.. EstadoDetenido
+EstadoReproductor <|.. EstadoReproduciendo
+EstadoReproductor <|.. EstadoPausado
+
+Reproductor o-- EstadoReproductor : estado actual
+
+EstadoDetenido -right-> EstadoReproduciendo : play()
+EstadoReproduciendo -right-> EstadoPausado : pause()
+EstadoPausado -left-> EstadoReproduciendo : play()
+EstadoReproduciendo -down-> EstadoDetenido : stop()
+EstadoPausado -down-> EstadoDetenido : stop()
+
+note right of EstadoReproductor
+    STATE PATTERN
+    
+    Proposito:
+    * Comportamiento cambia segun estado
+    * Evitar condicionales complejos
+    * Transiciones controladas
+    
+    Estados posibles:
+    * Detenido: posicion = 0
+    * Reproduciendo: posicion incrementando
+    * Pausado: posicion fija
+    
+    Transiciones:
+    Detenido -> play() -> Reproduciendo
+    Reproduciendo -> pause() -> Pausado
+    Pausado -> play() -> Reproduciendo
+    Reproduciendo -> stop() -> Detenido
+    Pausado -> stop() -> Detenido
+end note
+
+note left of EstadoDetenido
+    Estado Detenido:
+    
+    * play(): Carga cancion, inicia reproduccion
+    * pause(): No permitido
+    * stop(): Ya detenido
+    * siguiente(): Cambiar cancion (sin reproducir)
+    * anterior(): Cambiar cancion (sin reproducir)
+end note
+
+note left of EstadoReproduciendo
+    Estado Reproduciendo:
+    
+    * play(): Ya reproduciendo
+    * pause(): Guardar posicion, pausar
+    * stop(): Reiniciar posicion, detener
+    * siguiente(): Cambiar y reproducir
+    * anterior(): Cambiar y reproducir
+end note
+
+note left of EstadoPausado
+    Estado Pausado:
+    
+    * play(): Restaurar posicion, reanudar
+    * pause(): Ya pausado
+    * stop(): Reiniciar posicion, detener
+    * siguiente(): No permitido
+    * anterior(): No permitido
+end note
+
+@enduml
+
+@startuml Patron_Observer_Eventos_Reproductor
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón OBSERVER - Sistema de Eventos del Reproductor
+
+package "<<Pattern Interfaces>>" #Pink {
+    interface "Observer<T>" as Observer {
+        +actualizar(evento : T) : void
+    }
+    
+    abstract class "Observable<T>" as Observable {
+        #_observadores : List<Observer<T>>
+        ====
+        +agregar_observador(obs : Observer<T>) : void
+        +eliminar_observador(obs : Observer<T>) : void
+        #notificar_observadores(evento : T) : void
+    }
+}
+
+package "<<Subject - Observable>>" #LightCyan {
+    class Reproductor {
+        -_estado : EstadoReproductor
+        -_cancion_actual : Cancion
+        -_posicion : int
+        ====
+        +play() : void
+        +pause() : void
+        +stop() : void
+        +siguiente() : void
+        -_notificar_cancion_iniciada() : void
+        -_notificar_cancion_finalizada() : void
+        -_notificar_estado_cambiado() : void
+        -_notificar_error() : void
+    }
+}
+
+package "<<Observers Concretos>>" #LightYellow {
+    class UIObserver {
+        +actualizar(evento : EventoReproductor) : void
+        -_actualizar_barra_progreso() : void
+        -_actualizar_botones() : void
+        -_mostrar_metadata() : void
+    }
+    
+    class LoggerObserver {
+        +actualizar(evento : EventoReproductor) : void
+        -_registrar_reproduccion() : void
+        -_registrar_error() : void
+    }
+    
+    class AnalyticsObserver {
+        +actualizar(evento : EventoReproductor) : void
+        -_enviar_estadistica() : void
+        -_incrementar_contador() : void
+    }
+    
+    class HistorialObserver {
+        +actualizar(evento : EventoReproductor) : void
+        -_agregar_al_historial() : void
+        -_actualizar_cancion_reciente() : void
+    }
+}
+
+package "<<Event Data>>" #LightGreen {
+    class EventoReproductor {
+        +tipo : TipoEvento
+        +cancion : Cancion
+        +posicion : int
+        +timestamp : datetime
+    }
+    
+    enum TipoEvento {
+        CANCION_INICIADA
+        CANCION_FINALIZADA
+        REPRODUCCION_PAUSADA
+        REPRODUCCION_REANUDADA
+        REPRODUCCION_DETENIDA
+        ERROR
+    }
+}
+
+Observable <|-- Reproductor
+Observer <|.. UIObserver
+Observer <|.. LoggerObserver
+Observer <|.. AnalyticsObserver
+Observer <|.. HistorialObserver
+
+Reproductor "1" --> "0..*" Observer : notifica a >
+Reproductor --> EventoReproductor : genera
+
+note right of Observable
+    OBSERVER PATTERN
+    
+    Proposito:
+    * Notificacion automatica de eventos
+    * Desacoplamiento reproductor-observadores
+    * Arquitectura event-driven
+    
+    Implementacion:
+    * Generic type-safe: Observable<T>
+    * Thread-safe con listas protegidas
+    * Push-based notification
+    
+    Flujo:
+    1. Reproductor genera evento
+    2. notificar_observadores(evento)
+    3. Cada Observer.actualizar(evento)
+    4. Observadores procesan segun tipo
+end note
+
+note left of UIObserver
+    Observer de UI:
+    
+    * Actualiza interfaz grafica
+    * Muestra metadata de cancion
+    * Actualiza barra de progreso
+    * Habilita/deshabilita botones
+    * Muestra portada del album
+end note
+
+note left of LoggerObserver
+    Observer de Logs:
+    
+    * Registra eventos en archivo
+    * Timestamp de cada accion
+    * Errores de reproduccion
+    * Estadisticas de uso
+end note
+
+note left of AnalyticsObserver
+    Observer de Analytics:
+    
+    * Envia datos a sistema analitico
+    * Cuenta reproducciones
+    * Tracks de usuario
+    * Metricas de uso
+end note
+
+note left of HistorialObserver
+    Observer de Historial:
+    
+    * Agrega cancion al historial
+    * Actualiza canciones recientes
+    * Mantiene ultimas 50 canciones
+    * Sincroniza con base de datos
+end note
+
+@enduml
+
+@startuml Patron_Iterator_Cola_Reproduccion
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Patrón ITERATOR - Cola de Reproducción
+
+package "<<Iterator Interface>>" #LightPink {
+    interface Iterator {
+        +has_next() : bool
+        +has_previous() : bool
+        +next() : Cancion
+        +previous() : Cancion
+        +current() : Cancion
+        +reset() : void
+    }
+}
+
+package "<<Aggregate Interface>>" #LightPink {
+    interface IterableCollection {
+        +create_iterator() : Iterator
+    }
+}
+
+package "<<Concrete Iterator>>" #LightCyan {
+    class ColaIterator {
+        -_cola : ColaReproduccion
+        -_indice_actual : int
+        ====
+        +__init__(cola : ColaReproduccion)
+        +has_next() : bool
+        +has_previous() : bool
+        +next() : Cancion
+        +previous() : Cancion
+        +current() : Cancion
+        +reset() : void
+    }
+}
+
+package "<<Concrete Aggregate>>" #LightYellow {
+    class ColaReproduccion {
+        -_canciones : List<Cancion>
+        -_indice_actual : int
+        -_modo_aleatorio : bool
+        -_modo_repetir : str
+        ====
+        +__init__()
+        +agregar_cancion(cancion : Cancion) : void
+        +insertar_cancion(cancion : Cancion, pos : int) : void
+        +eliminar_cancion(pos : int) : void
+        +limpiar() : void
+        +siguiente() : Cancion
+        +anterior() : Cancion
+        +get_actual() : Cancion
+        +set_modo_aleatorio(activado : bool) : void
+        +set_modo_repetir(modo : str) : void
+        +create_iterator() : Iterator
+        +get_canciones() : List<Cancion>
+        +get_tamano() : int
+    }
+}
+
+package "<<Entities>>" #LightGreen {
+    class Cancion {
+        -_id : int
+        -_titulo : str
+        -_artista : Artista
+        -_duracion : int
+        ====
+        +get_titulo() : str
+        +get_duracion() : int
+    }
+}
+
+Iterator <|.. ColaIterator
+IterableCollection <|.. ColaReproduccion
+
+ColaIterator --> ColaReproduccion : itera sobre
+ColaReproduccion o-- Cancion : contiene
+
+note right of Iterator
+    ITERATOR PATTERN
+    
+    Proposito:
+    * Acceso secuencial a coleccion
+    * Ocultar estructura interna
+    * Multiples iteradores simultaneos
+    
+    Operaciones:
+    * next(): Avanzar a siguiente
+    * previous(): Retroceder a anterior
+    * current(): Obtener actual
+    * has_next(): Verificar si hay siguiente
+    * has_previous(): Verificar si hay anterior
+    * reset(): Volver al inicio
+end note
+
+note left of ColaReproduccion
+    Cola de Reproduccion
+    
+    Modos de reproduccion:
+    
+    * Normal: Secuencial 1, 2, 3...
+    * Aleatorio: Orden random
+    * Repetir Uno: Repite cancion actual
+    * Repetir Todos: Vuelve al inicio
+    * Sin Repetir: Se detiene al final
+    
+    Comportamiento:
+    * Modo aleatorio: Mezcla indices
+    * Repetir uno: next() = current()
+    * Repetir todos: next() reinicia si es ultimo
+    * Sin repetir: next() retorna None si es ultimo
+end note
+
+@enduml
+
+@startuml Integracion_Todos_Patrones
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+
+title Integración de Todos los Patrones de Diseño
+
+package "Cliente" #LightBlue {
+    class Main {
+        +main() : void
+    }
+}
+
+package "Singleton + Registry" #LightYellow {
+    class ContenidoServiceRegistry {
+        {static} +get_instance() : ContenidoServiceRegistry
+        +reproducir(contenido, usuario) : void
+        +mostrar_datos(contenido) : void
+    }
+}
+
+package "Factory Method" #Orange {
+    class PlanFactory {
+        {static} +crear_plan(tipo) : Plan
+    }
+}
+
+package "Strategy" #LightPink {
+    interface CalidadAudioStrategy {
+        +obtener_archivo(cancion) : str
+    }
+    
+    interface RestriccionStrategy {
+        +puede_saltar(usuario) : bool
+        +puede_descargar(usuario) : bool
+    }
+}
+
+package "State" #LightCyan {
+    class Reproductor {
+        -_estado : EstadoReproductor
+        +play() : void
+        +pause() : void
+        +stop() : void
+    }
+    
+    interface EstadoReproductor {
+        +handle_play() : void
+        +handle_pause() : void
+    }
+}
+
+package "Observer" #LightGreen {
+    interface Observer {
+        +actualizar(evento) : void
+    }
+    
+    class UIObserver
+    class LoggerObserver
+    class AnalyticsObserver
+}
+
+package "Iterator" #LightSalmon {
+    class ColaReproduccion {
+        +siguiente() : Cancion
+        +anterior() : Cancion
+        +create_iterator() : Iterator
+    }
+}
+
+Main --> PlanFactory : usa
+Main --> ContenidoServiceRegistry : usa
+Main --> Reproductor : crea
+
+ContenidoServiceRegistry --> CalidadAudioStrategy : usa
+ContenidoServiceRegistry --> RestriccionStrategy : usa
+
+Reproductor o-- EstadoReproductor : estado actual
+Reproductor --> Observer : notifica
+Reproductor --> ColaReproduccion : usa
+
+Observer <|.. UIObserver
+Observer <|.. LoggerObserver
+Observer <|.. AnalyticsObserver
+
+note as N1
+    INTEGRACION DE PATRONES
+    
+    Orquestacion de 6 patrones:
+    
+    1. Singleton: Unica instancia de Registry
+    2. Factory: Crea planes de suscripcion
+    3. Strategy: Calidad audio y restricciones
+    4. State: Estados del reproductor
+    5. Observer: Eventos de reproduccion
+    6. Iterator: Navegacion en cola
+    
+    Todos trabajan juntos para crear
+    un sistema flexible, extensible
+    y mantenible similar a Spotify.
+end note
+
+note as N2
+    Flujo completo de reproduccion:
+    
+    1. Main crea usuario con Factory (Plan)
+    2. Main obtiene Registry (Singleton)
+    3. Registry reproduce cancion con Strategy (Calidad)
+    4. Reproductor cambia State (Reproduciendo)
+    5. Reproductor notifica Observers (UI, Logger)
+    6. ColaReproduccion usa Iterator (Siguiente)
+    7. Strategy verifica Restricciones (Saltos)
+end note
+
+@enduml

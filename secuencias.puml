@@ -1,0 +1,821 @@
+@startuml Registro_Usuario_Con_Plan
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Registro de Usuario con Plan
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Service>>\nUsuarioService" #LightYellow
+participant ":UsuarioService" as US
+end box
+
+box "<<Factory>>\nPlanFactory" #Orange
+participant "PlanFactory" as PF
+end box
+
+box "<<Entity>>\nUsuario" #LightGreen
+participant ":Usuario" as U
+end box
+
+box "<<Entity>>\nPlan" #LightGreen
+participant ":Plan" as P
+end box
+
+box "<<Entity>>\nPerfil" #LightGreen
+participant ":Perfil" as Perfil
+end box
+
+== 1. CREAR USUARIO CON PLAN ==
+
+Cliente -> US: crear_usuario(username, email,\nplan_tipo, pais)
+activate Cliente
+activate US
+
+US -> US: validar_username_unico(username)
+activate US
+
+alt Username ya existe
+    US --> Cliente: UsuarioExistenteException
+else Username disponible
+    US --> US: OK
+    deactivate US
+    
+    note right of US: Usar Factory para crear plan
+    
+    US -> PF: crear_plan(plan_tipo)
+    activate PF
+    
+    alt plan_tipo == "Premium"
+        PF -> P: <<create>>\n__init__(precio=999, calidad=320kbps,\nanuncios=False, descargas=True)
+        activate P
+        P --> PF: plan
+        deactivate P
+    else plan_tipo == "Free"
+        PF -> P: <<create>>\n__init__(precio=0, calidad=128kbps,\nanuncios=True, descargas=False)
+        activate P
+        P --> PF: plan
+        deactivate P
+    else plan_tipo == "Family"
+        PF -> P: <<create>>\n__init__(precio=1499, calidad=Lossless,\nanuncios=False, descargas=True, usuarios=6)
+        activate P
+        P --> PF: plan
+        deactivate P
+    end
+    
+    PF --> US: plan
+    deactivate PF
+    
+    US -> U: <<create>>\n__init__(username, email, plan, pais)
+    activate U
+    U --> US: usuario
+    deactivate U
+    
+    US -> Perfil: <<create>>\n__init__(usuario, plan)
+    activate Perfil
+    Perfil --> US: perfil
+    deactivate Perfil
+    
+    US -> U: set_perfil(perfil)
+    activate U
+    U --> US
+    deactivate U
+    
+    US --> Cliente: usuario
+end
+
+deactivate US
+deactivate Cliente
+
+@enduml
+
+@startuml Reproducir_Cancion_Con_Plan
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Reproducir Canción según Plan
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Service>>\nReproductorService" #LightYellow
+participant ":ReproductorService" as RS
+end box
+
+box "<<Strategy>>\nCalidadStrategy" #LightPink
+participant ":CalidadStrategy" as CS
+end box
+
+box "<<Entity>>\nReproductor" #LightGreen
+participant ":Reproductor" as R
+end box
+
+box "<<Entity>>\nCancion" #LightGreen
+participant ":Cancion" as C
+end box
+
+box "<<Entity>>\nUsuario" #LightGreen
+participant ":Usuario" as U
+end box
+
+box "<<Entity>>\nHistorial" #LightGreen
+participant ":Historial" as H
+end box
+
+== 1. VERIFICAR PLAN Y SELECCIONAR CALIDAD ==
+
+Cliente -> RS: reproducir(cancion, usuario)
+activate Cliente
+activate RS
+
+RS -> U: get_plan()
+activate U
+U --> RS: plan
+deactivate U
+
+RS -> RS: seleccionar_estrategia_calidad(plan)
+activate RS
+
+alt plan == "Free"
+    RS -> CS: <<create>>\nCalidadBajaStrategy()
+    activate CS
+    note right of CS: 128kbps\nMostrar anuncios cada 3 canciones
+    CS --> RS: estrategia
+    deactivate CS
+else plan == "Premium"
+    RS -> CS: <<create>>\nCalidadAltaStrategy()
+    activate CS
+    note right of CS: 320kbps\nSin anuncios
+    CS --> RS: estrategia
+    deactivate CS
+else plan == "Family"
+    RS -> CS: <<create>>\nCalidadLosslessStrategy()
+    activate CS
+    note right of CS: FLAC\nSin anuncios
+    CS --> RS: estrategia
+    deactivate CS
+end
+
+RS --> RS: estrategia_seleccionada
+deactivate RS
+
+== 2. VERIFICAR ARCHIVO Y REPRODUCIR ==
+
+RS -> C: get_archivo_audio(calidad)
+activate C
+
+alt Archivo existe
+    C --> RS: ruta_archivo
+    deactivate C
+    
+    RS -> CS: obtener_archivo(cancion, calidad)
+    activate CS
+    CS --> RS: archivo_audio
+    deactivate CS
+    
+    RS -> R: cargar_audio(archivo_audio)
+    activate R
+    R --> RS
+    deactivate R
+    
+    RS -> R: play()
+    activate R
+    R -> R: cambiar_estado(Reproduciendo)
+    R --> RS
+    deactivate R
+    
+    == 3. ACTUALIZAR ESTADISTICAS ==
+    
+    RS -> C: incrementar_reproducciones()
+    activate C
+    C --> RS
+    deactivate C
+    
+    RS -> U: agregar_al_historial(cancion)
+    activate U
+    U -> H: agregar(cancion)
+    activate H
+    H --> U
+    deactivate H
+    U --> RS
+    deactivate U
+    
+    == 4. MOSTRAR ANUNCIO SI ES FREE ==
+    
+    alt plan == "Free" AND reproducciones % 3 == 0
+        RS -> RS: mostrar_anuncio()
+        activate RS
+        note right of RS: Anuncio de 15 segundos
+        RS --> RS
+        deactivate RS
+    end
+    
+    RS --> Cliente: reproduciendo
+    
+else Archivo no existe
+    C --> RS: ArchivoNoEncontradoException
+    deactivate C
+    RS --> Cliente: ArchivoNoEncontradoException
+end
+
+deactivate RS
+deactivate Cliente
+
+@enduml
+
+@startuml Crear_Playlist_Y_Agregar_Canciones
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Crear Playlist y Agregar Canciones
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Service>>\nPlaylistService" #LightYellow
+participant ":PlaylistService" as PS
+end box
+
+box "<<Entity>>\nPlaylist" #LightGreen
+participant ":Playlist" as PL
+end box
+
+box "<<Entity>>\nCancion" #LightGreen
+participant ":Cancion" as C
+end box
+
+box "<<Entity>>\nBiblioteca" #LightGreen
+participant ":Biblioteca" as B
+end box
+
+== 1. CREAR PLAYLIST ==
+
+Cliente -> PS: crear_playlist(nombre, descripcion,\nusuario, publica)
+activate Cliente
+activate PS
+
+PS -> PL: <<create>>\n__init__(nombre, descripcion, usuario, publica)
+activate PL
+PL --> PS: playlist
+deactivate PL
+
+PS -> B: agregar_playlist(playlist)
+activate B
+B --> PS
+deactivate B
+
+PS --> Cliente: playlist
+deactivate PS
+
+== 2. AGREGAR CANCIONES A LA PLAYLIST ==
+
+Cliente -> PS: agregar_cancion(playlist, cancion)
+activate PS
+
+PS -> PL: get_duracion_total()
+activate PL
+PL --> PS: duracion_actual
+deactivate PL
+
+PS -> C: get_duracion()
+activate C
+C --> PS: duracion_cancion
+deactivate C
+
+PS -> PL: agregar_cancion(cancion)
+activate PL
+PL --> PS
+deactivate PL
+
+PS -> PL: set_duracion_total(duracion_actual + duracion_cancion)
+activate PL
+PL --> PS
+deactivate PL
+
+note right of PS: Calcular duración total\nautomáticamente
+
+PS --> Cliente: void
+deactivate PS
+
+== 3. MOSTRAR PLAYLIST ==
+
+Cliente -> PS: mostrar_playlist(playlist)
+activate PS
+
+PS -> PL: get_nombre()
+activate PL
+PL --> PS: nombre
+deactivate PL
+
+PS -> PL: get_canciones()
+activate PL
+PL --> PS: canciones[]
+deactivate PL
+
+loop Para cada canción
+    PS -> C: get_titulo()
+    activate C
+    C --> PS: titulo
+    deactivate C
+    
+    PS -> C: get_artista()
+    activate C
+    C --> PS: artista
+    deactivate C
+    
+    note right of PS: Imprimir:\nN. Titulo - Artista (Duracion)
+end
+
+PS -> PL: get_duracion_total()
+activate PL
+PL --> PS: duracion_total
+deactivate PL
+
+note right of PS: Mostrar:\nDuracion total: HH:MM:SS
+
+PS --> Cliente: void
+deactivate PS
+
+deactivate Cliente
+
+@enduml
+
+@startuml Control_Reproductor_State_Pattern
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Control del Reproductor con State Pattern
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Entity>>\nReproductor" #LightGreen
+participant ":Reproductor" as R
+end box
+
+box "<<State>>\nEstadoReproductor" #LightPink
+participant ":EstadoDetenido" as ED
+participant ":EstadoReproduciendo" as ER
+participant ":EstadoPausado" as EP
+end box
+
+box "<<Entity>>\nColaReproduccion" #LightGreen
+participant ":Cola" as Cola
+end box
+
+== 1. ESTADO INICIAL - DETENIDO ==
+
+Cliente -> R: play()
+activate Cliente
+activate R
+
+R -> R: get_estado_actual()
+activate R
+R --> R: EstadoDetenido
+deactivate R
+
+R -> ED: handle_play(reproductor)
+activate ED
+
+ED -> Cola: get_cancion_actual()
+activate Cola
+Cola --> ED: cancion
+deactivate Cola
+
+ED -> R: cargar_cancion(cancion)
+activate R
+R --> ED
+deactivate R
+
+ED -> R: set_estado(EstadoReproduciendo)
+activate R
+R --> ED
+deactivate R
+
+note right of ED: Cambio de estado:\nDetenido -> Reproduciendo
+
+ED --> R
+deactivate ED
+
+R --> Cliente: reproduciendo
+deactivate R
+
+== 2. PAUSAR REPRODUCCION ==
+
+Cliente -> R: pause()
+activate R
+
+R -> R: get_estado_actual()
+activate R
+R --> R: EstadoReproduciendo
+deactivate R
+
+R -> ER: handle_pause(reproductor)
+activate ER
+
+ER -> R: get_posicion_actual()
+activate R
+R --> ER: posicion
+deactivate R
+
+ER -> R: guardar_posicion(posicion)
+activate R
+R --> ER
+deactivate R
+
+ER -> R: set_estado(EstadoPausado)
+activate R
+R --> ER
+deactivate R
+
+note right of ER: Cambio de estado:\nReproduciendo -> Pausado
+
+ER --> R
+deactivate ER
+
+R --> Cliente: pausado
+deactivate R
+
+== 3. REANUDAR REPRODUCCION ==
+
+Cliente -> R: play()
+activate R
+
+R -> R: get_estado_actual()
+activate R
+R --> R: EstadoPausado
+deactivate R
+
+R -> EP: handle_play(reproductor)
+activate EP
+
+EP -> R: get_posicion_guardada()
+activate R
+R --> EP: posicion
+deactivate R
+
+EP -> R: restaurar_posicion(posicion)
+activate R
+R --> EP
+deactivate R
+
+EP -> R: set_estado(EstadoReproduciendo)
+activate R
+R --> EP
+deactivate R
+
+note right of EP: Cambio de estado:\nPausado -> Reproduciendo
+
+EP --> R
+deactivate EP
+
+R --> Cliente: reproduciendo
+deactivate R
+
+== 4. DETENER REPRODUCCION ==
+
+Cliente -> R: stop()
+activate R
+
+R -> R: get_estado_actual()
+activate R
+R --> R: EstadoReproduciendo
+deactivate R
+
+R -> ER: handle_stop(reproductor)
+activate ER
+
+ER -> R: reiniciar_posicion()
+activate R
+R --> ER
+deactivate R
+
+ER -> R: set_estado(EstadoDetenido)
+activate R
+R --> ER
+deactivate R
+
+note right of ER: Cambio de estado:\nReproduciendo -> Detenido
+
+ER --> R
+deactivate ER
+
+R --> Cliente: detenido
+deactivate R
+
+== 5. SIGUIENTE CANCION ==
+
+Cliente -> R: siguiente()
+activate R
+
+R -> Cola: siguiente()
+activate Cola
+Cola --> R: cancion_siguiente
+deactivate Cola
+
+alt Hay siguiente canción
+    R -> R: cargar_cancion(cancion_siguiente)
+    activate R
+    R --> R
+    deactivate R
+    
+    R -> R: play()
+    activate R
+    R --> R
+    deactivate R
+    
+    R --> Cliente: reproduciendo_siguiente
+else No hay siguiente
+    R -> R: stop()
+    activate R
+    R --> R
+    deactivate R
+    
+    R --> Cliente: fin_de_cola
+end
+
+deactivate R
+deactivate Cliente
+
+@enduml
+
+@startuml Cambiar_Plan_Suscripcion
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Cambiar Plan de Suscripción
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Service>>\nSuscripcionService" #LightYellow
+participant ":SuscripcionService" as SS
+end box
+
+box "<<Factory>>\nPlanFactory" #Orange
+participant "PlanFactory" as PF
+end box
+
+box "<<Entity>>\nUsuario" #LightGreen
+participant ":Usuario" as U
+end box
+
+box "<<Entity>>\nPlan" #LightGreen
+participant ":PlanAnterior" as PA
+participant ":PlanNuevo" as PN
+end box
+
+box "<<Strategy>>\nRestriccionStrategy" #LightPink
+participant ":RestriccionStrategy" as RS
+end box
+
+== 1. VERIFICAR PLAN ACTUAL ==
+
+Cliente -> SS: cambiar_plan(usuario, plan_nuevo_tipo)
+activate Cliente
+activate SS
+
+SS -> U: get_plan()
+activate U
+U --> SS: plan_actual
+deactivate U
+
+SS -> PA: get_nombre()
+activate PA
+PA --> SS: nombre_actual
+deactivate PA
+
+note right of SS: Plan actual: Free\nPlan nuevo: Premium
+
+== 2. CREAR NUEVO PLAN CON FACTORY ==
+
+SS -> PF: crear_plan(plan_nuevo_tipo)
+activate PF
+
+PF -> PN: <<create>>\n__init__(precio, calidad, anuncios, descargas)
+activate PN
+PN --> PF: plan_nuevo
+deactivate PN
+
+PF --> SS: plan_nuevo
+deactivate PF
+
+== 3. APLICAR RESTRICCIONES DEL NUEVO PLAN ==
+
+SS -> SS: obtener_estrategia_restriccion(plan_nuevo)
+activate SS
+
+alt plan_nuevo == "Premium"
+    SS -> RS: <<create>>\nRestriccionPremiumStrategy()
+    activate RS
+    note right of RS: Saltos ilimitados\nSin anuncios\nDescargas: Si
+    RS --> SS: estrategia
+    deactivate RS
+else plan_nuevo == "Free"
+    SS -> RS: <<create>>\nRestriccionFreeStrategy()
+    activate RS
+    note right of RS: Saltos: 6/hora\nAnuncios: Si\nDescargas: No
+    RS --> SS: estrategia
+    deactivate RS
+end
+
+SS --> SS: estrategia_restriccion
+deactivate SS
+
+== 4. ACTUALIZAR USUARIO CON NUEVO PLAN ==
+
+SS -> U: set_plan(plan_nuevo)
+activate U
+U --> SS
+deactivate U
+
+SS -> U: set_estrategia_restriccion(estrategia_restriccion)
+activate U
+U --> SS
+deactivate U
+
+== 5. VERIFICAR CAMBIOS SI ES DOWNGRADE ==
+
+alt Es downgrade (Premium -> Free)
+    SS -> SS: aplicar_restricciones_downgrade(usuario)
+    activate SS
+    
+    note right of SS: Eliminar canciones descargadas\nResetear cola offline\nAplicar limite de saltos
+    
+    SS -> U: limpiar_descargas()
+    activate U
+    U --> SS
+    deactivate U
+    
+    SS -> U: set_limite_saltos(6)
+    activate U
+    U --> SS
+    deactivate U
+    
+    SS --> SS
+    deactivate SS
+end
+
+== 6. CONFIRMAR CAMBIO ==
+
+SS -> PA: get_precio()
+activate PA
+PA --> SS: precio_anterior
+deactivate PA
+
+SS -> PN: get_precio()
+activate PN
+PN --> SS: precio_nuevo
+deactivate PN
+
+note right of SS: Mostrar:\nCambio exitoso\nFree ($0) -> Premium ($999)\nCalidad: 128kbps -> 320kbps
+
+SS --> Cliente: cambio_exitoso
+deactivate SS
+deactivate Cliente
+
+@enduml
+
+@startuml Persistir_Y_Recuperar_Biblioteca
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+
+title Diagrama de Secuencia: Persistir y Recuperar Biblioteca
+
+box "Usuario" #LightBlue
+participant "Cliente" as Cliente
+end box
+
+box "<<Service>>\nBibliotecaService" #LightYellow
+participant ":BibliotecaService" as BS
+end box
+
+box "<<External>>\nSistema de Archivos" #LightGray
+participant "FileSystem" as FS
+end box
+
+box "<<Entity>>\nBiblioteca" #LightGreen
+participant ":Biblioteca" as B
+end box
+
+box "<<Entity>>\nUsuario" #LightGreen
+participant ":Usuario" as U
+end box
+
+== 1. PERSISTIR BIBLIOTECA ==
+
+Cliente -> BS: persistir(biblioteca)
+activate Cliente
+activate BS
+
+BS -> B: get_usuario()
+activate B
+B --> BS: usuario
+deactivate B
+
+BS -> U: get_username()
+activate U
+U --> BS: username
+deactivate U
+
+note right of BS: Nombre archivo:\nusername_biblioteca.dat
+
+BS -> FS: os.path.exists(data)
+activate FS
+FS --> BS: False
+deactivate FS
+
+alt Directorio no existe
+    BS -> FS: os.makedirs(data)
+    activate FS
+    note right of FS: Crear directorio\nsi no existe
+    FS --> BS
+    deactivate FS
+end
+
+BS -> FS: open(data/username_biblioteca.dat, wb)
+activate FS
+FS --> BS: file_handler
+deactivate FS
+
+BS -> FS: pickle.dump(biblioteca, file_handler)
+activate FS
+note right of FS: Serializa:\n- Playlists\n- Favoritos\n- Historial\n- Artistas seguidos\n- Albums guardados
+FS --> BS
+deactivate FS
+
+BS -> FS: file_handler.close()
+activate FS
+FS --> BS
+deactivate FS
+
+note right of BS: Mostrar:\nBiblioteca de username\npersistida exitosamente
+
+BS --> Cliente: void
+deactivate BS
+
+== 2. RECUPERAR BIBLIOTECA ==
+
+Cliente -> BS: leer_biblioteca(username)
+activate BS
+
+alt username es None o vacio
+    BS --> Cliente: ValueError(Username invalido)
+end
+
+BS -> FS: os.path.exists(data/username_biblioteca.dat)
+activate FS
+FS --> BS: existe
+deactivate FS
+
+alt Archivo existe
+    BS -> FS: open(data/username_biblioteca.dat, rb)
+    activate FS
+    FS --> BS: file_handler
+    deactivate FS
+    
+    BS -> FS: pickle.load(file_handler)
+    activate FS
+    note right of FS: Deserializa:\nBiblioteca completa
+    FS --> BS: biblioteca
+    deactivate FS
+    
+    BS -> FS: file_handler.close()
+    activate FS
+    FS --> BS
+    deactivate FS
+    
+    BS -> B: get_playlists()
+    activate B
+    B --> BS: playlists[]
+    deactivate B
+    
+    BS -> B: get_favoritos()
+    activate B
+    B --> BS: favoritos
+    deactivate B
+    
+    note right of BS: Mostrar:\nBiblioteca recuperada\nPlaylists: N\nFavoritos: M\nHistorial: P canciones
+    
+    BS --> Cliente: biblioteca
+    
+else Archivo no existe
+    BS --> Cliente: PersistenciaException(\nArchivo no encontrado,\nnombre_archivo,\nTipoOperacion.LECTURA)
+end
+
+deactivate BS
+deactivate Cliente
+
+@enduml
